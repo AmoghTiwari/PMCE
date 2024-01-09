@@ -1,0 +1,9 @@
+data/*
+checkpoints/*
+tmp_dir
+output/*
+mmcv
+ViTPose
+experiment
+pose_detector
+**pycache**
