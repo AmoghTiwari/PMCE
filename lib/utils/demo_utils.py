@@ -100,7 +100,7 @@ def trim_videos(filename, start_time, end_time, output_filename):
 
 def video_to_images(vid_file, img_folder=None, return_info=False):
     if img_folder is None:
-        img_folder = osp.join('/tmp', osp.basename(vid_file).replace('.', '_'))
+        img_folder = osp.join('./tmp_dir', osp.basename(vid_file).replace('.', '_'))
 
     os.makedirs(img_folder, exist_ok=True)
 
@@ -114,7 +114,6 @@ def video_to_images(vid_file, img_folder=None, return_info=False):
     subprocess.call(command)
 
     print(f'Images saved to \"{img_folder}\"')
-
     img_shape = cv2.imread(osp.join(img_folder, '000001.jpg')).shape
 
     if return_info:
