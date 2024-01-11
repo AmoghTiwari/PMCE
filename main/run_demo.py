@@ -180,7 +180,7 @@ def main(args):
     video_file = args.vid_file
     if video_file.startswith('https://www.youtube.com'):
         print(f"Donwloading YouTube video \'{video_file}\'")
-        video_file = download_youtube_clip(video_file, '/tmp')
+        video_file = download_youtube_clip(video_file, './tmp_dir')
         if video_file is None:
             exit('Youtube url is not valid!')
         print(f"YouTube Video has been downloaded to {video_file}...")
