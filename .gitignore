@@ -7,3 +7,4 @@ ViTPose
 experiment
 pose_detector
 **pycache**
+wandb
