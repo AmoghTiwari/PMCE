@@ -80,7 +80,8 @@ class Human36M(torch.utils.data.Dataset):
         self.img_paths, self.img_names, self.img_ids, self.bboxs, self.img_hws, self.joint_imgs, self.joint_cams, self.joint_vises, self.poses, self.shapes, self.transes, self.features, self.cam_idxs, self.joints_cam_h36m, \
         self.cam_param_focals, self.cam_param_princpts, self.cam_param_Rs, self.cam_param_ts= self.load_data()
         if self.data_split == 'test':
-            det_2d_data_path = osp.join(self.data_path, 'Human36M_test_cpn_joint_2d.json')
+            # det_2d_data_path = osp.join(self.data_path, 'Human36M_test_cpn_joint_2d.json')
+            det_2d_data_path = osp.join(self.data_path, 'annotations')
             self.datalist_pose2d_det, self.datalist_pose2d_det_name = self.load_pose2d_det(det_2d_data_path)
         elif self.data_split == 'train':
             if self.input_joint_name == 'human36':
@@ -612,9 +613,10 @@ class Human36M(torch.utils.data.Dataset):
         # root align joint
         pred_mesh, target_mesh = pred_mesh - pred_joint[:, :1, :], target_mesh - target_joint[:, :1, :]
         pred_joint, target_joint = pred_joint - pred_joint[:, :1, :], target_joint - target_joint[:, :1, :]
-
+        
         pred_mesh, target_mesh = pred_mesh.detach().cpu().numpy(), target_mesh.detach().cpu().numpy()
         pred_joint, target_joint = pred_joint.detach().cpu().numpy(), target_joint.detach().cpu().numpy()
+ 
 
         pred_joint, target_joint = pred_joint[:, self.human36_eval_joint, :], target_joint[:, self.human36_eval_joint, :]
         mesh_mean_error = np.power((np.power((pred_mesh - target_mesh), 2)).sum(axis=2), 0.5).mean()
@@ -739,6 +741,8 @@ class Human36M(torch.utils.data.Dataset):
         pred_j3ds_h36m = []  # acc error for each sequence
         gt_j3ds_h36m = []  # acc error for each sequence
         acc_error_h36m = 0.0
+        acc_error_h36m_v2 = []
+        acc_error_h36m_v3 = []
         last_seq_name = None
         
         # eval SMPL joints and mesh vertices
@@ -798,6 +802,8 @@ class Human36M(torch.utils.data.Dataset):
                 target_j3ds = np.array(gt_j3ds_h36m)
                 accel_err = np.zeros((len(pred_j3ds,)))
                 accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
+                acc_error_h36m_v2.append(accel_err)
+                acc_error_h36m_v3 += list(accel_err)
                 err = np.mean(np.array(accel_err))
                 acc_error_h36m += err.copy() * len(pred_j3ds)
                 pred_j3ds_h36m = [pose_coord_out_h36m.copy()]
@@ -806,7 +812,6 @@ class Human36M(torch.utils.data.Dataset):
                 pred_j3ds_h36m.append(pose_coord_out_h36m.copy())
                 gt_j3ds_h36m.append(pose_coord_gt_h36m.copy())
             last_seq_name = seq_name
-                
             pose_error_h36m[n] = np.sqrt(np.sum((pose_coord_out_h36m - pose_coord_gt_h36m) ** 2, 1))
             pose_coord_out_h36m = rigid_align(pose_coord_out_h36m, pose_coord_gt_h36m) # perform rigid alignment
             pose_pa_error_h36m[n] = np.sqrt(np.sum((pose_coord_out_h36m - pose_coord_gt_h36m) ** 2, 1))
@@ -829,6 +834,8 @@ class Human36M(torch.utils.data.Dataset):
         accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
         err = np.mean(np.array(accel_err))
         acc_error_h36m += err.copy() * len(pred_j3ds)
+        acc_error_h36m_v2.append(accel_err)
+        acc_error_h36m_v3 += list(accel_err)
             
         # total pose error (H36M joint set)
         tot_err = np.mean(pose_error_h36m)
@@ -847,3 +854,57 @@ class Human36M(torch.utils.data.Dataset):
         acc_error = acc_error_h36m / n
         eval_summary = 'Protocol ' + str(self.protocol) + ' H36M ACCEL (mm/s^2) >> tot: %.2f\n ' % (acc_error)
         print(eval_summary)
+    
+        acc_error_v2 = np.mean(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.mean(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        # ########## STD-DEV #########
+        print("####### ####### ######")
+        print("####### Printing Std Dev ######")
+        print("####### ####### ######")
+        tot_err = np.std(pose_error_h36m)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.std(pose_pa_error_h36m)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary) 
+
+        acc_error_v2 = np.std(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.std(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        # ########## VARIANCE #########
+        print("####### ####### ######")
+        print("####### Printing Variance ######")
+        print("####### ####### ######")
+        tot_err = np.var(pose_error_h36m)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.var(pose_pa_error_h36m)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        acc_error_v2 = np.var(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.var(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V3 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        np.save("output/error_arrays/mpjpe_h36m.npy", pose_error_h36m)   
+        np.save("output/error_arrays/pampjpe_h36m.npy", pose_pa_error_h36m)
+        # np.save("output/error_arrays/mpvpe_3dpw.npy", mpvpe)
+        np.save("output/error_arrays/acc_error_h36m.npy", np.concatenate(acc_error_h36m_v2))
+        np.save("output/error_arrays/acc_error_h36m_v3.npy", np.array(acc_error_h36m_v3))
