@@ -569,6 +569,8 @@ class MPII3D(torch.utils.data.Dataset):
         pred_j3ds_h36m = []  # acc error for each sequence
         gt_j3ds_h36m = []  # acc error for each sequence
         acc_error_h36m = 0.0
+        acc_error_h36m_v2 = []
+        acc_error_h36m_v3 = []
         last_seq_name = None
 
         for n in range(sample_num):
@@ -593,6 +595,8 @@ class MPII3D(torch.utils.data.Dataset):
                 target_j3ds = np.array(gt_j3ds_h36m)
                 accel_err = np.zeros((len(pred_j3ds,)))
                 accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
+                acc_error_h36m_v2.append(accel_err)
+                acc_error_h36m_v3+= list(accel_err)
                 err = np.mean(np.array(accel_err))
                 acc_error_h36m += err.copy() * len(pred_j3ds)
                 pred_j3ds_h36m = [joint_coord_out.copy()]
@@ -611,7 +615,14 @@ class MPII3D(torch.utils.data.Dataset):
         accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
         err = np.mean(np.array(accel_err))
         acc_error_h36m += err.copy() * len(pred_j3ds)
+        acc_error_h36m_v2.append(accel_err)
+        acc_error_h36m_v3+= list(accel_err)
         
+        # ########## Mean #########
+        print("####### ####### ######")
+        print("####### Printing Mean Values ######")
+        print("####### ####### ######")
+
         tot_err = np.mean(mpjpe)
         eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
         print(eval_summary)
@@ -623,3 +634,57 @@ class MPII3D(torch.utils.data.Dataset):
         acc_error = acc_error_h36m / sample_num
         acc_eval_summary = 'H36M ACCEL (mm/s^2) >> tot: %.2f\n ' % (acc_error)
         print(acc_eval_summary)
+
+        acc_error_v2 = np.mean(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.mean(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        # ########## STD-DEV #########
+        print("####### ####### ######")
+        print("####### Printing Std Dev ######")
+        print("####### ####### ######")
+        tot_err = np.std(mpjpe)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.std(pa_mpjpe)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary) 
+
+        acc_error_v2 = np.std(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.std(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        # ########## VARIANCE #########
+        print("####### ####### ######")
+        print("####### Printing Variance ######")
+        print("####### ####### ######")
+        tot_err = np.var(mpjpe)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.var(pa_mpjpe)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        acc_error_v2 = np.var(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.var(np.array(acc_error_h36m_v3))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        np.save("output/error_arrays/mpjpe_mpii3d.npy", mpjpe)   
+        np.save("output/error_arrays/pampjpe_mpii3d.npy", pa_mpjpe)
+        # np.save("output/error_arrays/mpvpe_3dpw.npy", mpvpe)
+        np.save("output/error_arrays/acc_error_mpii3d.npy", np.concatenate(acc_error_h36m_v2))
+        np.save("output/error_arrays/acc_error_mpii3d_v3.npy", np.array(acc_error_h36m_v3))

@@ -312,6 +312,7 @@ class PW3D(torch.utils.data.Dataset):
             mpjpe[n] = np.sqrt(np.sum((joint_coord_out - joint_coord_gt) ** 2, 1))
             
             seq_name = self.vid_names[mid_index]
+
             if last_seq_name is not None and seq_name != last_seq_name:
                 pred_j3ds = np.array(pred_j3ds_h36m)
                 target_j3ds = np.array(gt_j3ds_h36m)
@@ -350,6 +351,7 @@ class PW3D(torch.utils.data.Dataset):
 
     def evaluate(self, outs):
         print('Evaluation start...')
+        # breakpoint()
         annots = self.vid_indices
         assert len(annots) == len(outs)
         sample_num = len(outs)
@@ -364,6 +366,8 @@ class PW3D(torch.utils.data.Dataset):
         pred_j3ds_h36m = []  # acc error for each sequence
         gt_j3ds_h36m = []  # acc error for each sequence
         acc_error_h36m = 0.0
+        acc_error_h36m_v2 = []
+        acc_error_h36m_v3 = []
         last_seq_name = None
 
         for n in range(sample_num):
@@ -411,11 +415,14 @@ class PW3D(torch.utils.data.Dataset):
             pred_j3d.append(pose_coord_out_h36m); gt_j3d.append(pose_coord_gt_h36m)
 
             seq_name = self.vid_names[mid_index]
+
             if last_seq_name is not None and seq_name != last_seq_name:
                 pred_j3ds = np.array(pred_j3ds_h36m)
                 target_j3ds = np.array(gt_j3ds_h36m)
                 accel_err = np.zeros((len(pred_j3ds,)))
                 accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
+                acc_error_h36m_v2.append(accel_err)
+                acc_error_h36m_v3+= list(accel_err)
                 err = np.mean(np.array(accel_err))
                 acc_error_h36m += err.copy() * len(pred_j3ds)
                 pred_j3ds_h36m = [pose_coord_out_h36m.copy()]
@@ -428,7 +435,7 @@ class PW3D(torch.utils.data.Dataset):
             mpjpe_h36m[n] = np.sqrt(np.sum((pose_coord_out_h36m - pose_coord_gt_h36m)**2,1))
             pose_coord_out_h36m_aligned = rigid_align(pose_coord_out_h36m, pose_coord_gt_h36m) # perform rigid 
             pampjpe_h36m[n] = np.sqrt(np.sum((pose_coord_out_h36m_aligned - pose_coord_gt_h36m)**2,1))
-            
+
             vis = cfg.TEST.vis
             if vis and (n % 1000 == 0):
                 mesh_to_save = mesh_coord_out / 1000
@@ -439,11 +446,15 @@ class PW3D(torch.utils.data.Dataset):
         
         pred_j3ds = np.array(pred_j3ds_h36m)
         target_j3ds = np.array(gt_j3ds_h36m)
+
         accel_err = np.zeros((len(pred_j3ds,)))
         accel_err[1:-1] = compute_error_accel(joints_pred=pred_j3ds, joints_gt=target_j3ds)
         err = np.mean(np.array(accel_err))
         acc_error_h36m += err.copy() * len(pred_j3ds)
-
+        acc_error_h36m_v2.append(accel_err)
+        acc_error_h36m_v3 += list(accel_err)
+        acc_error_h36m_v3 = np.array(acc_error_h36m_v3)
+        ########## MEAN ERROR #########
         tot_err = np.mean(mpjpe_h36m)
         eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
         print(eval_summary)
@@ -456,7 +467,73 @@ class PW3D(torch.utils.data.Dataset):
         tot_err = np.mean(mpvpe)
         eval_summary = 'MPVPE (mm)          >> tot: %.2f\n' % (tot_err)
         print(eval_summary)
-        
+
         acc_error = acc_error_h36m / sample_num
         eval_summary = 'H36M ACCEL (mm/s^2) >> tot: %.2f\n ' % (acc_error)
         print(eval_summary)
+
+        acc_error_v2 = np.mean(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.mean(acc_error_h36m_v3)
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+
+        # ########## STD-DEV #########
+        print("####### ####### ######")
+        print("####### Printing Std Dev ######")
+        print("####### ####### ######")
+        tot_err = np.std(mpjpe_h36m)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.std(pampjpe_h36m)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        # total mesh error
+        tot_err = np.std(mpvpe)
+        eval_summary = 'MPVPE (mm)          >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        acc_error_v2 = np.std(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.std(acc_error_h36m_v3)
+        eval_summary = 'H36M ACCEL - V3 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+
+        # ########## VARIANCE #########
+        print("####### ####### ######")
+        print("####### Printing Variance ######")
+        print("####### ####### ######")
+        tot_err = np.var(mpjpe_h36m)
+        eval_summary = '\nH36M MPJPE (mm)     >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        tot_err = np.var(pampjpe_h36m)
+        eval_summary = 'H36M PA-MPJPE (mm)  >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        # total mesh error
+        tot_err = np.var(mpvpe)
+        eval_summary = 'MPVPE (mm)          >> tot: %.2f\n' % (tot_err)
+        print(eval_summary)
+
+        acc_error_v2 = np.var(np.concatenate(acc_error_h36m_v2))
+        eval_summary = 'H36M ACCEL - V2 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v2)
+        print(eval_summary)
+
+        acc_error_v3 = np.var(acc_error_h36m_v3)
+        eval_summary = 'H36M ACCEL - V3 (mm/s^2) >> tot: %.2f\n ' % (acc_error_v3)
+        print(eval_summary)
+
+        np.save("output/error_arrays/mpjpe_3dpw.npy", mpjpe_h36m)
+        np.save("output/error_arrays/pampjpe_3dpw.npy", pampjpe_h36m)
+        np.save("output/error_arrays/mpvpe_3dpw.npy", mpvpe)
+        np.save("output/error_arrays/acc_error_3dpw_v2.npy", np.concatenate(acc_error_h36m_v2))
+        np.save("output/error_arrays/acc_error_3dpw_v3.npy", acc_error_h36m_v3)
