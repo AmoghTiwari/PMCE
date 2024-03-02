@@ -243,4 +243,5 @@ def compute_error_accel(joints_gt, joints_pred, vis=None):
         new_invis = np.logical_or(invis, np.logical_or(invis1, invis2))[:-2]
         new_vis = np.logical_not(new_invis)
 
-    return np.mean(normed[new_vis], axis=1)
+    # return np.mean(normed[new_vis], axis=1)
+    return normed[new_vis]
