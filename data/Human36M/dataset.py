@@ -80,9 +80,14 @@ class Human36M(torch.utils.data.Dataset):
         self.img_paths, self.img_names, self.img_ids, self.bboxs, self.img_hws, self.joint_imgs, self.joint_cams, self.joint_vises, self.poses, self.shapes, self.transes, self.features, self.cam_idxs, self.joints_cam_h36m, \
         self.cam_param_focals, self.cam_param_princpts, self.cam_param_Rs, self.cam_param_ts= self.load_data()
         if self.data_split == 'test':
-            # det_2d_data_path = osp.join(self.data_path, 'Human36M_test_cpn_joint_2d.json')
-            det_2d_data_path = osp.join(self.data_path, 'annotations')
-            self.datalist_pose2d_det, self.datalist_pose2d_det_name = self.load_pose2d_det(det_2d_data_path)
+            if self.input_joint_name == 'human36':
+                det_2d_data_path = osp.join(self.data_path, 'Human36M_test_cpn_joint_2d.json')
+                self.datalist_pose2d_det, self.datalist_pose2d_det_name = self.load_pose2d_det(det_2d_data_path)
+            elif self.input_joint_name == 'coco': ### New addition - Done by AT
+                # det_2d_data_path = osp.join(self.data_path, 'Human36M_test_cpn_joint_2d.json')
+                # det_2d_data_path = osp.join(self.data_path, 'annotations')
+                det_2d_data_path = self.annot_path
+                self.datalist_pose2d_det, self.datalist_pose2d_det_name = self.load_pose2d_det(det_2d_data_path)
         elif self.data_split == 'train':
             if self.input_joint_name == 'human36':
                 det_2d_data_path = osp.join(self.data_path, 'Human36M_train_cpn_joint_2d.json')
@@ -621,7 +626,7 @@ class Human36M(torch.utils.data.Dataset):
         pred_joint, target_joint = pred_joint[:, self.human36_eval_joint, :], target_joint[:, self.human36_eval_joint, :]
         mesh_mean_error = np.power((np.power((pred_mesh - target_mesh), 2)).sum(axis=2), 0.5).mean()
         joint_mean_error = np.power((np.power((pred_joint - target_joint), 2)).sum(axis=2), 0.5).mean()
-
+        
         return joint_mean_error, mesh_mean_error
 
     def evaluate_joint(self, outs):
@@ -728,8 +733,8 @@ class Human36M(torch.utils.data.Dataset):
             else:
                 mid_index = start_index + int(self.seqlen / 2)
             cam_idx = self.cam_idxs[mid_index]
-            if cam_idx != 4:
-                continue
+            # if cam_idx != 4:
+            #     continue
             sample_num_new += 1
 
         # eval H36M joints
@@ -751,6 +756,7 @@ class Human36M(torch.utils.data.Dataset):
         mesh_error = np.zeros((sample_num_new, self.smpl_vertex_num))  # mesh error
         mesh_error_action = [[] for _ in range(len(self.action_name))]  # mesh error for each sequence
 
+        breakpoint()
         n = 0
         for i in range(sample_num):
             start_index, end_index = self.vid_indices[i]
@@ -761,8 +767,8 @@ class Human36M(torch.utils.data.Dataset):
             out = outs[i]
 
             cam_idx = self.cam_idxs[mid_index]
-            if cam_idx != 4:
-                continue
+            # if cam_idx != 4:
+            #     continue
 
             # render materials
             img_path = self.img_paths[mid_index]
@@ -770,7 +776,8 @@ class Human36M(torch.utils.data.Dataset):
 
             # root joint alignment
             mesh_coord_out, mesh_coord_gt = out['mesh_coord'], out['mesh_coord_target']
-            joint_coord_out, joint_coord_gt = np.dot(self.joint_regressor_smpl, mesh_coord_out), np.dot(self.joint_regressor_smpl, mesh_coord_gt)
+            # joint_coord_out, joint_coord_gt = np.dot(self.joint_regressor_smpl, mesh_coord_out), np.dot(self.joint_regressor_smpl, mesh_coord_gt)
+            joint_coord_out, joint_coord_gt = out['joint_coord'], out['joint_coord_target']
             mesh_coord_out = mesh_coord_out - joint_coord_out[self.smpl_root_joint_idx:self.smpl_root_joint_idx+1]
             mesh_coord_gt = mesh_coord_gt - joint_coord_gt[self.smpl_root_joint_idx:self.smpl_root_joint_idx+1]
             pose_coord_out = joint_coord_out - joint_coord_out[self.smpl_root_joint_idx:self.smpl_root_joint_idx+1]
@@ -790,9 +797,14 @@ class Human36M(torch.utils.data.Dataset):
 
             # pose error of h36m calculate
             pose_coord_out_h36m = np.dot(self.joint_regressor_human36, mesh_coord_out)
+            pose_coord_out_h36m = out['joint_coord']
             pose_coord_out_h36m = pose_coord_out_h36m - pose_coord_out_h36m[self.human36_root_joint_idx]
             pose_coord_out_h36m = pose_coord_out_h36m[self.human36_eval_joint, :]
-            pose_coord_gt_h36m = self.joint_cams[mid_index]
+            # pose_coord_gt_h36m = self.joint_cams[mid_index]
+            # pose_coord_gt_h36m = np.dot(self.joint_regressor_human36, mesh_coord_gt)
+            # pose_coord_gt_h36m = out['joint_coord_target']
+            pose_coord_gt_h36m = self.joints_cam_h36m[mid_index]
+
             pose_coord_gt_h36m = pose_coord_gt_h36m - pose_coord_gt_h36m[self.human36_root_joint_idx]
             pose_coord_gt_h36m = pose_coord_gt_h36m[self.human36_eval_joint, :]
             
@@ -905,6 +917,6 @@ class Human36M(torch.utils.data.Dataset):
 
         np.save("output/error_arrays/mpjpe_h36m.npy", pose_error_h36m)   
         np.save("output/error_arrays/pampjpe_h36m.npy", pose_pa_error_h36m)
-        # np.save("output/error_arrays/mpvpe_3dpw.npy", mpvpe)
+        np.save("output/error_arrays/mpvpe_.npy", mesh_error)
         np.save("output/error_arrays/acc_error_h36m.npy", np.concatenate(acc_error_h36m_v2))
         np.save("output/error_arrays/acc_error_h36m_v3.npy", np.array(acc_error_h36m_v3))
