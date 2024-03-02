@@ -201,6 +201,7 @@ class Tester:
         # initialize error value
         self.surface_error = 9999.9
         self.joint_error = 9999.9
+        self.cfg_cmd = args.cfg
 
     def test(self, epoch, current_model=None):
         if current_model:
@@ -211,6 +212,7 @@ class Tester:
         joint_error = 0.0
 
         result = []
+        eval_summary = f"Running eval with cfg -> {self.cfg_cmd}\n"
         eval_prefix = f'Epoch{epoch} ' if epoch else ''
         loader = tqdm(self.val_loader)
         with torch.no_grad():
@@ -246,6 +248,7 @@ class Tester:
             self.joint_error = joint_error / len(self.val_loader)
             
             print(f'{eval_prefix}MPVPE: {self.surface_error:.2f}, MPJPE: {self.joint_error:.2f}')
+            eval_summary+= f'(Initial Eval) {eval_prefix}MPVPE: {self.surface_error:.2f}, MPJPE: {self.joint_error:.2f}\n'
 
             if cfg.TRAIN.wandb:
                 wandb_joint_error = self.joint_error
@@ -260,7 +263,7 @@ class Tester:
 
             # Final Evaluation
             if (epoch == 0 or epoch == cfg.TRAIN.end_epoch):
-                self.val_dataset.evaluate(result)
+                self.val_dataset.evaluate(result, eval_summary)
 
 
 class LiftTrainer:
